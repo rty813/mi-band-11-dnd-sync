@@ -1,0 +1,407 @@
+diff --git a/smali_classes11/com/xiaomi/fitness/devicesettings/DeviceSettingsSyncer.smali b/smali_classes11/com/xiaomi/fitness/devicesettings/DeviceSettingsSyncer.smali
+index 212c7ac..b651f83 100644
+--- a/smali_classes11/com/xiaomi/fitness/devicesettings/DeviceSettingsSyncer.smali
++++ b/smali_classes11/com/xiaomi/fitness/devicesettings/DeviceSettingsSyncer.smali
+@@ -4520,7 +4520,10 @@
+ 
+     move-result p2
+ 
+-    if-nez p2, :cond_1
++    if-eqz p2, :cond_0
++    sget-object p2, Lcom/xiaomi/fitness/devicesettings/utils/ZenUtils;->INSTANCE:Lcom/xiaomi/fitness/devicesettings/utils/ZenUtils;
++    invoke-virtual {p2}, Lcom/xiaomi/fitness/devicesettings/utils/ZenUtils;->registerZenListener()V
++    goto :cond_1
+ 
+     :cond_0
+     sget-object p2, Lcom/xiaomi/fitness/devicesettings/common/zenmode/ZenModeSyncHelper;->INSTANCE:Lcom/xiaomi/fitness/devicesettings/common/zenmode/ZenModeSyncHelper;
+diff --git a/smali_classes11/com/xiaomi/fitness/devicesettings/utils/ZenUtils.smali b/smali_classes11/com/xiaomi/fitness/devicesettings/utils/ZenUtils.smali
+index 72a21fb..34a857b 100644
+--- a/smali_classes11/com/xiaomi/fitness/devicesettings/utils/ZenUtils.smali
++++ b/smali_classes11/com/xiaomi/fitness/devicesettings/utils/ZenUtils.smali
+@@ -62,6 +62,8 @@
+ 
+ .field private static preValue:Z = false
+ 
++.field private static zenObserverRegistered:Z
++
+ .field public static final sTag:Ljava/lang/String; = "zenMode"
+     .annotation build Lorg/jetbrains/annotations/NotNull;
+     .end annotation
+@@ -222,6 +224,9 @@
+ 
+     invoke-virtual {v0, v1}, Landroid/content/ContentResolver;->unregisterContentObserver(Landroid/database/ContentObserver;)V
+ 
++    const/4 v0, 0x0
++    sput-boolean v0, Lcom/xiaomi/fitness/devicesettings/utils/ZenUtils;->zenObserverRegistered:Z
++
+     :cond_0
+     return-void
+ .end method
+@@ -286,10 +291,25 @@
+ 
+     invoke-static {v4, v1}, Lcom/xiaomi/fitness/common/log/Logger;->i(Ljava/lang/String;Ljava/lang/String;)V
+ 
++    # Keep the wearable feature check, but do not reject Android 15+ devices.
+-    if-nez v0, :cond_3
++    if-nez v3, :cond_3
+ 
+     if-eqz p1, :cond_2
+ 
++    sget-object v0, Landroid/os/Build;->MANUFACTURER:Ljava/lang/String;
++    const-string v1, "samsung"
++    invoke-virtual {v1, v0}, Ljava/lang/String;->equalsIgnoreCase(Ljava/lang/String;)Z
++    move-result v0
++    if-eqz v0, :check_quiet_mode
++    invoke-static {p1}, Lcom/xiaomi/fitness/device/manager/DeviceModelExtKt;->getModel(Lcom/xiaomi/fitness/device/manager/DeviceModel;)Ljava/lang/String;
++    move-result-object v0
++    const-string v1, "miwear.watch.q66u"
++    invoke-virtual {v1, v0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
++    move-result v0
++    if-eqz v0, :check_quiet_mode
++    return v2
++
++    :check_quiet_mode
+     const-string v0, "quiet_mode"
+ 
+     invoke-static {p1, v0}, Lcom/xiaomi/fitness/device/manager/DeviceModelExtKt;->isSupportFeature(Lcom/xiaomi/fitness/device/manager/DeviceModel;Ljava/lang/String;)Z
+@@ -509,6 +529,9 @@
+ .method public final registerZenListener()V
+     .locals 4
+ 
++    sget-boolean v0, Lcom/xiaomi/fitness/devicesettings/utils/ZenUtils;->zenObserverRegistered:Z
++    if-nez v0, :cond_0
++
+     const/4 v0, 0x0
+ 
+     const/4 v1, 0x1
+@@ -537,6 +560,8 @@
+ 
+     invoke-virtual {v2, v0, v1, v3}, Landroid/content/ContentResolver;->registerContentObserver(Landroid/net/Uri;ZLandroid/database/ContentObserver;)V
+ 
++    sput-boolean v1, Lcom/xiaomi/fitness/devicesettings/utils/ZenUtils;->zenObserverRegistered:Z
++
+     :cond_0
+     return-void
+ .end method
+diff --git a/smali_classes11/com/xiaomi/fitness/devicesettings/utils/ZenUtils$postSyncZenMode$2.smali b/smali_classes11/com/xiaomi/fitness/devicesettings/utils/ZenUtils$postSyncZenMode$2.smali
+index cb0e6fe..bf3e71c 100644
+--- a/smali_classes11/com/xiaomi/fitness/devicesettings/utils/ZenUtils$postSyncZenMode$2.smali
++++ b/smali_classes11/com/xiaomi/fitness/devicesettings/utils/ZenUtils$postSyncZenMode$2.smali
+@@ -220,6 +220,14 @@
+ 
+     invoke-static {v1, v0}, Lcom/xiaomi/fitness/common/log/Logger;->i(Ljava/lang/String;Ljava/lang/String;)V
+ 
++    invoke-static {}, Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->isQ66()Z
++    move-result v0
++    if-eqz v0, :use_legacy_state
++    invoke-static {}, Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->read()V
++    sget-object p1, Lkotlin/Unit;->INSTANCE:Lkotlin/Unit;
++    return-object p1
++    :use_legacy_state
++
+     invoke-virtual {v2}, Lcku;->F()Ld1s;
+ 
+     move-result-object v0
+diff --git a/smali_classes11/com/xiaomi/fitness/devicesettings/utils/Q66ZenRules.smali b/smali_classes11/com/xiaomi/fitness/devicesettings/utils/Q66ZenRules.smali
+new file mode 100644
+--- /dev/null
++++ b/smali_classes11/com/xiaomi/fitness/devicesettings/utils/Q66ZenRules.smali
+@@ -0,0 +1,297 @@
++.class public final Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;
++.super Ljava/lang/Object;
++.implements Lcom/xiaomi/fitness/device/contact/export/OnSyncCallback;
++.implements Ljava/lang/Runnable;
++
++.field private phase:I
++.field private expected:I
++.field private device:Ljava/lang/String;
++.field private ticket:I
++.field private static final generation:Ljava/util/concurrent/atomic/AtomicInteger;
++
++.method static constructor <clinit>()V
++    .locals 1
++    new-instance v0,Ljava/util/concurrent/atomic/AtomicInteger;
++    invoke-direct {v0},Ljava/util/concurrent/atomic/AtomicInteger;-><init>()V
++    sput-object v0,Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->generation:Ljava/util/concurrent/atomic/AtomicInteger;
++    return-void
++.end method
++
++.method public constructor <init>()V
++    .locals 0
++    invoke-direct {p0}, Ljava/lang/Object;-><init>()V
++    return-void
++.end method
++
++.method public static isQ66()Z
++    .locals 4
++    const/4 v3, 0x0
++    const-string v0, "samsung"
++    sget-object v1, Landroid/os/Build;->MANUFACTURER:Ljava/lang/String;
++    invoke-virtual {v0,v1}, Ljava/lang/String;->equalsIgnoreCase(Ljava/lang/String;)Z
++    move-result v0
++    if-eqz v0, :no
++    sget-object v0, Lcom/xiaomi/fitness/device/manager/export/WearableDeviceManager;->Companion:Lcom/xiaomi/fitness/device/manager/export/WearableDeviceManager$Companion;
++    invoke-static {v0}, Lcom/xiaomi/fitness/device/manager/export/DeviceManagerExtKt;->getInstance(Lcom/xiaomi/fitness/device/manager/export/WearableDeviceManager$Companion;)Lcom/xiaomi/fitness/device/manager/export/WearableDeviceManager;
++    move-result-object v1
++    invoke-interface {v1}, Lcom/xiaomi/fitness/device/manager/DeviceManager;->getCurrentDeviceModel()Lcom/xiaomi/fitness/device/manager/DeviceModel;
++    move-result-object v2
++    if-eqz v2, :no
++    invoke-static {v2}, Lcom/xiaomi/fitness/device/manager/DeviceModelExtKt;->getModel(Lcom/xiaomi/fitness/device/manager/DeviceModel;)Ljava/lang/String;
++    move-result-object v2
++    const-string v0, "miwear.watch.q66u"
++    invoke-virtual {v0,v2}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
++    move-result v3
++    :no
++    return v3
++.end method
++
++.method public static read()V
++    .locals 2
++    new-instance v0,Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;
++    invoke-direct {v0},Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;-><init>()V
++    sget-object v1,Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->generation:Ljava/util/concurrent/atomic/AtomicInteger;
++    invoke-virtual {v1},Ljava/util/concurrent/atomic/AtomicInteger;->incrementAndGet()I
++    move-result v1
++    iput v1,v0,Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->ticket:I
++    invoke-virtual {v0},Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->run()V
++    return-void
++.end method
++
++.method public run()V
++    .locals 5
++    sget-object v0,Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->generation:Ljava/util/concurrent/atomic/AtomicInteger;
++    invoke-virtual {v0},Ljava/util/concurrent/atomic/AtomicInteger;->get()I
++    move-result v1
++    iget v2,p0,Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->ticket:I
++    if-ne v1,v2,:end
++    invoke-static {},Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->isQ66()Z
++    move-result v1
++    if-eqz v1,:end
++    new-instance v1,Lcku;
++    invoke-direct {v1},Lcku;-><init>()V
++    const/4 v2,2
++    iput v2,v1,Lcku;->e:I
++    const/16 v2,109
++    iput v2,v1,Lcku;->f:I
++    sget-object v0,Lcom/xiaomi/fitness/device/contact/export/DeviceContact;->Companion:Lcom/xiaomi/fitness/device/contact/export/DeviceContact$Companion;
++    invoke-static {v0},Lcom/xiaomi/fitness/device/contact/export/DeviceSyncExtKt;->getInstance(Lcom/xiaomi/fitness/device/contact/export/DeviceContact$Companion;)Lcom/xiaomi/fitness/device/contact/export/DeviceContact;
++    move-result-object v0
++    const/4 v2,1
++    move-object v3,p0
++    const/16 v4,8000
++    invoke-interface/range {v0 .. v4},Lcom/xiaomi/fitness/device/contact/export/DeviceContact;->call(Lcku;ZLcom/xiaomi/fitness/device/contact/export/OnSyncCallback;I)V
++    :end
++    return-void
++.end method
++
++.method public static metric(Ljava/lang/String;I)V
++    .locals 2
++    new-instance v0,Ljava/lang/StringBuilder;
++    invoke-direct {v0,p0},Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V
++    invoke-virtual {v0,p1},Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;
++    invoke-virtual {v0},Ljava/lang/StringBuilder;->toString()Ljava/lang/String;
++    move-result-object v0
++    const-string v1,"Q66ZenRules"
++    invoke-static {v1,v0},Landroid/util/Log;->i(Ljava/lang/String;Ljava/lang/String;)I
++    return-void
++.end method
++
++.method public onError(Ljava/lang/String;II)V
++    .locals 1
++    const-string v0,"rule operation error="
++    invoke-static {v0,p3},Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->metric(Ljava/lang/String;I)V
++    return-void
++.end method
++
++.method public onSuccess(Ljava/lang/String;ILcom/xiaomi/fitness/device/contact/export/SyncResult;)V
++    .locals 6
++    sget-object v1,Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->generation:Ljava/util/concurrent/atomic/AtomicInteger;
++    invoke-virtual {v1},Ljava/util/concurrent/atomic/AtomicInteger;->get()I
++    move-result v1
++    iget v0,p0,Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->ticket:I
++    if-ne v0,v1,:done
++    iget v0,p0,Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->phase:I
++    const/4 v1,1
++    if-ne v0,v1,:is_read
++    if-eqz p3,:done
++    invoke-virtual {p3},Lcom/xiaomi/fitness/device/contact/export/SyncResult;->isSuccess()Z
++    move-result v0
++    if-eqz v0,:done
++    const/4 v0,2
++    iput v0,p0,Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->phase:I
++    new-instance v1,Landroid/os/Handler;
++    invoke-static {},Landroid/os/Looper;->getMainLooper()Landroid/os/Looper;
++    move-result-object v0
++    invoke-direct {v1,v0},Landroid/os/Handler;-><init>(Landroid/os/Looper;)V
++    const-wide/16 v2,700
++    invoke-virtual {v1,p0,v2,v3},Landroid/os/Handler;->postDelayed(Ljava/lang/Runnable;J)Z
++    return-void
++    :is_read
++    iget-object v0,p0,Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->device:Ljava/lang/String;
++    if-eqz v0,:first_read
++    invoke-virtual {v0,p1},Ljava/lang/String;->equals(Ljava/lang/Object;)Z
++    move-result v0
++    if-eqz v0,:done
++    :first_read
++    if-eqz p3,:missing
++    invoke-virtual {p3},Lcom/xiaomi/fitness/device/contact/export/SyncResult;->getCode()I
++    move-result v1
++    const-string v0,"109 result="
++    invoke-static {v0,v1},Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->metric(Ljava/lang/String;I)V
++    invoke-virtual {p3},Lcom/xiaomi/fitness/device/contact/export/SyncResult;->isSuccess()Z
++    move-result v1
++    if-eqz v1,:missing
++    invoke-virtual {p3},Lcom/xiaomi/fitness/device/contact/export/SyncResult;->getPacket()Lcku;
++    move-result-object v0
++    if-eqz v0,:missing
++    invoke-virtual {v0},Lcku;->F()Ld1s;
++    move-result-object v0
++    if-eqz v0,:missing
++    invoke-virtual {v0},Ld1s;->Y()Ly1s$a;
++    move-result-object v0
++    if-eqz v0,:missing
++    move-object p3,v0
++    iget-object v1,v0,Ly1s$a;->c:[Ly1s;
++    if-eqz v1,:missing
++    array-length v2,v1
++    const-string v0,"rule count="
++    invoke-static {v0,v2},Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->metric(Ljava/lang/String;I)V
++    const/4 v3,0
++    :loop
++    if-ge v3,v2,:observed
++    aget-object v4,v1,v3
++    if-eqz v4,:next
++    iget-boolean v0,v4,Ly1s;->c:Z
++    if-eqz v0,:next
++    iget v5,v4,Ly1s;->e:I
++    const-string v0,"manual state="
++    invoke-static {v0,v5},Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->metric(Ljava/lang/String;I)V
++    iget v5,v4,Ly1s;->g:I
++    const-string v0,"manual timestamp="
++    invoke-static {v0,v5},Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->metric(Ljava/lang/String;I)V
++    :next
++    add-int/lit8 v3,v3,1
++    goto :loop
++    :observed
++    invoke-direct {p0,p1,p3},Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->reconcile(Ljava/lang/String;Ly1s$a;)V
++    return-void
++    :missing
++    const-string v0,"rule list missing="
++    const/4 v1,1
++    invoke-static {v0,v1},Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->metric(Ljava/lang/String;I)V
++    :done
++    return-void
++.end method
++
++.method private reconcile(Ljava/lang/String;Ly1s$a;)V
++    .locals 11
++    if-eqz p1,:end
++    invoke-static {},Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->isQ66()Z
++    move-result v0
++    if-eqz v0,:end
++    sget-object v0,Lcom/xiaomi/fitness/device/manager/export/WearableDeviceManager;->Companion:Lcom/xiaomi/fitness/device/manager/export/WearableDeviceManager$Companion;
++    invoke-static {v0},Lcom/xiaomi/fitness/device/manager/export/DeviceManagerExtKt;->getInstance(Lcom/xiaomi/fitness/device/manager/export/WearableDeviceManager$Companion;)Lcom/xiaomi/fitness/device/manager/export/WearableDeviceManager;
++    move-result-object v0
++    invoke-interface {v0},Lcom/xiaomi/fitness/device/manager/DeviceManager;->getCurrentDeviceModel()Lcom/xiaomi/fitness/device/manager/DeviceModel;
++    move-result-object v0
++    if-eqz v0,:end
++    invoke-interface {v0},Lcom/xiaomi/fitness/device/manager/DeviceModel;->getDid()Ljava/lang/String;
++    move-result-object v0
++    invoke-virtual {p1,v0},Ljava/lang/String;->equals(Ljava/lang/Object;)Z
++    move-result v0
++    if-eqz v0,:end
++    sget-object v0,Lcom/xiaomi/fitness/devicesettings/utils/DeviceSettingsPreference;->INSTANCE:Lcom/xiaomi/fitness/devicesettings/utils/DeviceSettingsPreference;
++    invoke-virtual {v0,p1},Lcom/xiaomi/fitness/devicesettings/utils/DeviceSettingsPreference;->isZenModeOpen(Ljava/lang/String;)Z
++    move-result v0
++    if-eqz v0,:end
++    iget-object v0,p2,Ly1s$a;->c:[Ly1s;
++    array-length v1,v0
++    const/4 v2,0
++    const/4 v3,0
++    :scan
++    if-ge v2,v1,:scanned
++    aget-object v4,v0,v2
++    if-eqz v4,:end
++    iget-boolean v5,v4,Ly1s;->c:Z
++    if-eqz v5,:next
++    if-nez v3,:end
++    move-object v3,v4
++    :next
++    add-int/lit8 v2,v2,1
++    goto :scan
++    :scanned
++    if-eqz v3,:end
++    iget v5,v3,Ly1s;->e:I
++    iget v0,p0,Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->phase:I
++    if-eqz v0,:initial
++    iget v0,p0,Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->expected:I
++    const/4 v1,0
++    if-ne v5,v0,:log_checked
++    const/4 v1,1
++    :log_checked
++    const-string v0,"verified manual state match="
++    invoke-static {v0,v1},Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->metric(Ljava/lang/String;I)V
++    return-void
++    :initial
++    invoke-static {},Lcom/xiaomi/fitness/common/extensions/ApplicationExtKt;->getApplication()Landroid/app/Application;
++    move-result-object v0
++    const-string v1,"notification"
++    invoke-virtual {v0,v1},Landroid/content/Context;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;
++    move-result-object v0
++    check-cast v0,Landroid/app/NotificationManager;
++    invoke-virtual {v0},Landroid/app/NotificationManager;->getCurrentInterruptionFilter()I
++    move-result v0
++    if-lez v0,:end
++    const/4 v2,4
++    if-gt v0,v2,:end
++    const/4 v1,1
++    if-ne v0,v1,:state
++    const/4 v1,0
++    :state
++    if-eq v5,v1,:end
++    sget-object v0,Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->generation:Ljava/util/concurrent/atomic/AtomicInteger;
++    invoke-virtual {v0},Ljava/util/concurrent/atomic/AtomicInteger;->get()I
++    move-result v0
++    iget v2,p0,Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->ticket:I
++    if-ne v0,v2,:end
++    invoke-static {},Ljava/lang/System;->currentTimeMillis()J
++    move-result-wide v6
++    const-wide/16 v8,1000
++    div-long/2addr v6,v8
++    long-to-int v6,v6
++    iget v7,v3,Ly1s;->g:I
++    add-int/lit8 v8,v6,5
++    if-gt v7,v8,:end
++    if-gt v6,v7,:set_time
++    add-int/lit8 v6,v7,1
++    :set_time
++    iput v6,v3,Ly1s;->g:I
++    iput v1,v3,Ly1s;->e:I
++    iput v1,p0,Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->expected:I
++    iput-object p1,p0,Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->device:Ljava/lang/String;
++    const/4 v0,1
++    iput v0,p0,Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->phase:I
++    const-string v0,"110 requested manual state="
++    invoke-static {v0,v1},Lcom/xiaomi/fitness/devicesettings/utils/Q66ZenRules;->metric(Ljava/lang/String;I)V
++    new-instance v2,Lcku;
++    invoke-direct {v2},Lcku;-><init>()V
++    const/4 v0,2
++    iput v0,v2,Lcku;->e:I
++    const/16 v0,110
++    iput v0,v2,Lcku;->f:I
++    new-instance v0,Ld1s;
++    invoke-direct {v0},Ld1s;-><init>()V
++    invoke-virtual {v0,p2},Ld1s;->O0(Ly1s$a;)Ld1s;
++    invoke-virtual {v2,v0},Lcku;->e0(Ld1s;)Lcku;
++    sget-object v0,Lcom/xiaomi/fitness/device/contact/export/DeviceContact;->Companion:Lcom/xiaomi/fitness/device/contact/export/DeviceContact$Companion;
++    invoke-static {v0},Lcom/xiaomi/fitness/device/contact/export/DeviceSyncExtKt;->getInstance(Lcom/xiaomi/fitness/device/contact/export/DeviceContact$Companion;)Lcom/xiaomi/fitness/device/contact/export/DeviceContact;
++    move-result-object v0
++    move-object v1,p1
++    const/4 v3,0
++    move-object v4,p0
++    const/16 v5,8000
++    invoke-interface/range {v0 .. v5},Lcom/xiaomi/fitness/device/contact/export/DeviceContact;->call(Ljava/lang/String;Lcku;ZLcom/xiaomi/fitness/device/contact/export/OnSyncCallback;I)I
++    :end
++    return-void
++.end method
+

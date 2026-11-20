@@ -1,0 +1,28 @@
+# Android build output
+.gradle/
+.kotlin/
+.idea/
+input/
+build/
+**/build/
+local.properties
+
+# APKs, signing materials, and private captures
+*.apk
+*.apks
+*.xapk
+*.dex
+*.aab
+*.idsig
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+*.log
+*.pcap
+*.pcapng
+*.btsnoop*
+bugreport*
+private/
+
