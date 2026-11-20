@@ -35,6 +35,10 @@
 | [scripts/apply-patch.ps1](scripts/apply-patch.ps1) | 检查或应用补丁 |
 | [probe/](probe/) | 蓝牙连接探针（调查用） |
 
+## 社区
+
+- 社区链接：[LINUX DO](https://linux.do/)
+
 ## 参考
 
 - [Gadgetbridge](https://codeberg.org/Freeyourgadget/Gadgetbridge)
